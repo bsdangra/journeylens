@@ -52,6 +52,23 @@ Dashboard: http://localhost:3001
 
 The API CORS configuration currently allows `http://localhost:3001`.
 
+## Start the storefront from Windows Command Prompt
+
+Open Command Prompt and change to the repository directory (replace `<your-user>` with your Windows username):
+
+``` bat
+cd C:\Users\<your-user>\source\repos\journeylens
+```
+
+Install dependencies if you have not already, then start the storefront:
+
+``` bat
+npm install
+npm run dev:storefront
+```
+
+The storefront runs at http://localhost:3002. Leave the Command Prompt window open while using it, and press `Ctrl+C` to stop the server.
+
 ## Run evaluation
 
 ``` bash
