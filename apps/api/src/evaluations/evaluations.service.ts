@@ -1,44 +1,94 @@
-import { Injectable } from '@nestjs/common';
+import {
+  BadRequestException,
+  Injectable,
+  InternalServerErrorException,
+  Logger,
+  NotFoundException,
+} from '@nestjs/common';
 import { randomUUID } from 'node:crypto';
 
 import {
   executeJourney,
   purchaseJourney,
-  personas,
+  getJourneyById,
+  availableJourneys,
+  getPersonas,
   generateReport,
 } from '@journeylens/journey-engine';
 
 import type {
   ExecutionResult,
   EvaluationReport,
+  TriggerEvaluationDto,
+  EvaluationResultResponse,
 } from '@journeylens/contracts';
 
 @Injectable()
 export class EvaluationsService {
-  async runEvaluation() {
-    const evaluationId = randomUUID();
+  private readonly logger = new Logger(EvaluationsService.name);
 
+  async runEvaluation(
+    dto?: TriggerEvaluationDto,
+  ): Promise<EvaluationResultResponse> {
+    const journeyId = dto?.journeyId || purchaseJourney.id;
+    const baseJourney = getJourneyById(journeyId);
+
+    if (!baseJourney) {
+      const available = availableJourneys.map((j) => j.id).join(', ');
+      throw new NotFoundException(
+        `Journey with ID '${journeyId}' was not found. Available journeys: ${available}`,
+      );
+    }
+
+    // Apply URL override if specified
+    const journey = dto?.websiteUrl
+      ? { ...baseJourney, startUrl: dto.websiteUrl }
+      : baseJourney;
+
+    const targetPersonas = getPersonas(dto?.personaIds);
+    if (!targetPersonas || targetPersonas.length === 0) {
+      throw new BadRequestException('No valid personas selected for evaluation.');
+    }
+
+    const evaluationId = randomUUID();
     const executions: ExecutionResult[] = [];
     const reports: EvaluationReport[] = [];
 
-    for (const persona of personas) {
-      const execution = await executeJourney(
-        purchaseJourney,
-        evaluationId,
-        persona.id,
+    this.logger.log(
+      `Starting evaluation ${evaluationId} for journey ${journey.id} across ${targetPersonas.length} persona(s)`,
+    );
+
+    try {
+      for (const persona of targetPersonas) {
+        this.logger.log(
+          `Executing persona '${persona.name}' (${persona.id})`,
+        );
+
+        const execution = await executeJourney(
+          journey,
+          evaluationId,
+          persona.id,
+        );
+
+        executions.push(execution);
+
+        const report = generateReport(execution, persona);
+        reports.push(report);
+      }
+    } catch (error) {
+      this.logger.error(
+        `Failed executing evaluation ${evaluationId}: ${error instanceof Error ? error.message : String(error)}`,
+        error instanceof Error ? error.stack : undefined,
       );
-
-      executions.push(execution);
-
-      const report = generateReport(execution, persona);
-
-      reports.push(report);
+      throw new InternalServerErrorException(
+        `Evaluation execution failed: ${error instanceof Error ? error.message : String(error)}`,
+      );
     }
 
     return {
       id: evaluationId,
-      websiteUrl: purchaseJourney.startUrl,
-      journeyId: purchaseJourney.id,
+      websiteUrl: journey.startUrl,
+      journeyId: journey.id,
       status: executions.every(
         (execution) => execution.status === 'completed',
       )

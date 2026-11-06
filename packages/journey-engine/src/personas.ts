@@ -47,3 +47,11 @@ export const personas: Persona[] = [
     ],
   },
 ];
+
+export function getPersonas(personaIds?: string[]): Persona[] {
+  if (!personaIds || personaIds.length === 0) {
+    return personas;
+  }
+  const filtered = personas.filter((p) => personaIds.includes(p.id));
+  return filtered.length > 0 ? filtered : personas;
+}

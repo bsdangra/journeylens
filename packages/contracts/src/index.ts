@@ -74,6 +74,22 @@ export interface Evaluation {
   createdAt: string;
 }
 
+export interface TriggerEvaluationDto {
+  journeyId?: string;
+  websiteUrl?: string;
+  personaIds?: string[];
+}
+
+export interface EvaluationResultResponse {
+  id: string;
+  websiteUrl: string;
+  journeyId: string;
+  status: EvaluationStatus;
+  createdAt: string;
+  executions: ExecutionResult[];
+  reports: EvaluationReport[];
+}
+
 // ============================================
 // Browser execution results
 // ============================================

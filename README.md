@@ -55,45 +55,81 @@ docs                     Project documentation
 `workers/` and `infrastructure/` are future targets, not implemented.
 Browser execution currently lives in `packages/journey-engine`.
 
-## Quick start
+## 📋 Prerequisites
 
-Requirements: Node.js 20+, npm, Git.
+- **Node.js**: `20+` (tested with Node 24 and Node 26)
+- **npm**: `10+`
+- **Git**
+- **Playwright Chromium**: Required for headless browser journey execution and evidence collection (`npx playwright install chromium`)
 
-``` bash
+## 🚀 Local Setup & Running the Application
+
+### 1. Install Dependencies & Browser Binaries
+
+```bash
 npm install
 npx playwright install chromium
+```
+
+### 2. Build Packages in Dependency Order
+
+From the repository root, build the shared packages and the backend API:
+
+```bash
 npm run build -w @journeylens/contracts
 npm run build -w @journeylens/scoring-engine
 npm run build -w @journeylens/journey-engine
 npm run build -w @journeylens/api
 ```
 
-Terminal 1:
+### 3. Start the Backend API (Terminal 1)
 
-``` bash
+```bash
 npm run start:dev -w @journeylens/api
 ```
 
-Terminal 2:
+- **API URL**: http://localhost:3000
+- **Health check**:
+  ```bash
+  curl http://localhost:3000/health
+  ```
 
-``` bash
+### 4. Start the Web Dashboard (Terminal 2)
+
+```bash
 npm run dev -w web -- --port 3001
 ```
 
-Dashboard: http://localhost:3001\
-API: http://localhost:3000
+- **Dashboard URL**: http://localhost:3001
+- *(Note: Port 3001 is required because the NestJS API runs on port 3000 and CORS is configured for port 3001).*
 
-``` bash
-curl http://localhost:3000/health
-curl -X POST http://localhost:3000/evaluations -H "Content-Type: application/json"
-```
+### 5. Trigger an Evaluation
+
+You can execute a journey in either of two ways:
+
+- **Via Web Dashboard**: Open [http://localhost:3001](http://localhost:3001), choose your journey and personas, and click **Run Evaluation →**.
+- **Via cURL**:
+  ```bash
+  curl -X POST http://localhost:3000/evaluations \
+    -H "Content-Type: application/json" \
+    -d '{
+      "journeyId": "JL-JRN-001",
+      "websiteUrl": "https://www.saucedemo.com/",
+      "personaIds": [
+        "first-time-shopper",
+        "time-conscious-shopper",
+        "accessibility-conscious-shopper"
+      ]
+    }'
+  ```
 
 ## Documentation
 
--   [Architecture](ARCHITECTURE.md)
--   [Project status](PROJECT_STATUS.md)
--   [Local setup](LOCAL_SETUP.md)
--   [Task breakdown](TASK_BREAKDOWN.md)
+-   [Changelog](CHANGELOG.md)
+-   [Architecture](docs/ARCHITECTURE.md)
+-   [Project status](docs/PROJECT_STATUS.md)
+-   [Local setup](docs/LOCAL_SETUP.md)
+-   [Task breakdown](docs/TASK_BREAKDOWN.md)
 
 ## Product principles
 

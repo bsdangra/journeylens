@@ -31,6 +31,9 @@ before release planning.
   NestJS API              Working                 Health and evaluation
                                                   endpoints
 
+  Input-driven triggers   Implemented             Dynamic journey ID, URL
+                                                  override, persona filtering
+
   Screenshot serving      Working                 Static assets
 
   Dashboard               Working                 Displays evaluation

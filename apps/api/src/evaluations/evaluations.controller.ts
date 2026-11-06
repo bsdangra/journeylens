@@ -1,5 +1,12 @@
-import { Controller, Post } from '@nestjs/common';
+import {
+  Body,
+  Controller,
+  HttpCode,
+  HttpStatus,
+  Post,
+} from '@nestjs/common';
 import { EvaluationsService } from './evaluations.service';
+import { TriggerEvaluationRequestDto } from './dto/trigger-evaluation.dto';
 
 @Controller('evaluations')
 export class EvaluationsController {
@@ -8,7 +15,9 @@ export class EvaluationsController {
   ) {}
 
   @Post()
-  runEvaluation() {
-    return this.evaluationsService.runEvaluation();
+  @HttpCode(HttpStatus.OK)
+  runEvaluation(@Body() dto?: TriggerEvaluationRequestDto) {
+    console.log('[EvaluationsController] >>> POST /evaluations received with payload:', dto);
+    return this.evaluationsService.runEvaluation(dto);
   }
 }
