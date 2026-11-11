@@ -213,3 +213,27 @@ export interface AccessibilityIncompleteCheck {
     failureSummary: string | null;
   }[];
 }
+// ============================================
+// API payloads
+// ============================================
+
+/** A journey without its steps, as listed by GET /journeys. */
+export interface JourneySummary {
+  id: string;
+  name: string;
+  description?: string;
+  startUrl: string;
+  stepCount: number;
+}
+
+/** Body of POST /evaluations. */
+export interface EvaluationRequest {
+  journeyId: string;
+  personaIds: string[];
+}
+
+/** Response of POST /evaluations. */
+export interface EvaluationResult extends Evaluation {
+  executions: ExecutionResult[];
+  reports: EvaluationReport[];
+}
