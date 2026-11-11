@@ -1,10 +1,28 @@
 # Changelog
 
-All notable changes implemented in branch `JOUR-20` compared to `main`.
+All notable changes implemented in JourneyLens.
 
 ---
 
-## [Unreleased] - Branch `JOUR-20`
+## [Unreleased] - Branch `JOUR-22`
+
+### 🚀 Pass Website URL, Persona and Journey Parameters to Playwright
+
+#### 1. Dynamic Playwright Initial Navigation Override (`apps/api`)
+- **Step-Level URL Override**: Updated `EvaluationsService.runEvaluation` to map over `baseJourney.steps` so that the initial `navigate` step's `value` is dynamically replaced with `dto.websiteUrl`. Playwright now genuinely navigates to the requested target URL instead of staying locked to the journey's default URL.
+
+#### 2. Strict Persona Filtering & Validation (`packages/journey-engine` & `apps/api`)
+- **Strict Matching**: Refactored `getPersonas()` in `packages/journey-engine` to return only matching personas (returning `[]` if no IDs match) rather than silently falling back to all personas.
+- **Request Validation**: The API now throws `BadRequestException` (HTTP 400) if none of the supplied `personaIds` are valid, preventing headless browsers from launching under ambiguous configurations.
+- **Unit Testing**: Added unit test in `evaluations.service.spec.ts` verifying that invalid `personaIds` trigger `BadRequestException`.
+
+#### 3. Interactive Web Dashboard Website URL Input (`apps/web`)
+- **Editable URL Control**: Replaced the static read-only input with a controlled `<input type="url">` bound to `websiteUrl` state.
+- **Dynamic API Dispatch**: The user-entered URL is trimmed and passed into the `POST /evaluations` request payload when clicking **Run Evaluation →**.
+
+---
+
+## [Merged] - PR #2 (Branch `JOUR-20`)
 
 ### 🚀 New Features
 

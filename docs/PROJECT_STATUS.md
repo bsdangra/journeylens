@@ -32,7 +32,9 @@ before release planning.
                                                   endpoints
 
   Input-driven triggers   Implemented             Dynamic journey ID, URL
-                                                  override, persona filtering
+                                                  override (with step-level
+                                                  navigation forwarding), strict
+                                                  persona filtering, input validation
 
   Screenshot serving      Working                 Static assets
 
@@ -56,8 +58,10 @@ before release planning.
 
 -   API health endpoint returned HTTP 200.
 -   `POST /evaluations` executed the demo for all three personas.
+-   Custom website URL correctly overrides initial Playwright navigation step.
+-   Invalid persona selections return HTTP 400 Bad Request.
 -   An observed successful run completed all 12 steps per persona.
--   Dashboard called the API and displayed results.
+-   Dashboard called the API and displayed results with editable website URL input.
 -   Screenshot URLs returned HTTP 200.
 -   Journey-engine, scoring-engine and API builds passed.
 

@@ -147,6 +147,7 @@ export default function Home() {
   const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  const [websiteUrl, setWebsiteUrl] = useState("https://www.saucedemo.com/");
   const [selectedJourneyId, setSelectedJourneyId] = useState("JL-JRN-001");
   const [selectedPersonas, setSelectedPersonas] = useState<string[]>([
     "first-time-shopper",
@@ -166,11 +167,12 @@ export default function Home() {
 
   async function runEvaluation() {
     const apiUrl = getApiUrl();
+    const targetUrl = websiteUrl.trim() || "https://www.saucedemo.com/";
     console.log("[JourneyLens] 'Run Evaluation' clicked");
     console.log("[JourneyLens] Calling endpoint:", `${apiUrl}/evaluations`);
     console.log("[JourneyLens] Payload:", {
       journeyId: selectedJourneyId,
-      websiteUrl: "https://www.saucedemo.com/",
+      websiteUrl: targetUrl,
       personaIds: selectedPersonas,
     });
 
@@ -184,7 +186,7 @@ export default function Home() {
         headers: { "Content-Type": "application/json" },
         body: JSON.stringify({
           journeyId: selectedJourneyId,
-          websiteUrl: "https://www.saucedemo.com/",
+          websiteUrl: targetUrl,
           personaIds: selectedPersonas,
         }),
       });
@@ -292,7 +294,13 @@ export default function Home() {
               <label>WEBSITE URL</label>
               <div className="url-input">
                 <span>↗</span>
-                <input value="https://www.saucedemo.com/" readOnly />
+                <input
+                  type="url"
+                  value={websiteUrl}
+                  onChange={(e) => setWebsiteUrl(e.target.value)}
+                  placeholder="https://www.saucedemo.com/"
+                  title="Target website URL for evaluation"
+                />
               </div>
             </div>
             <div className="field">

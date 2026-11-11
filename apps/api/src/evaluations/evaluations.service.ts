@@ -40,9 +40,17 @@ export class EvaluationsService {
       );
     }
 
-    // Apply URL override if specified
+    // Apply URL override if specified, updating both startUrl and the initial navigate step
     const journey = dto?.websiteUrl
-      ? { ...baseJourney, startUrl: dto.websiteUrl }
+      ? {
+          ...baseJourney,
+          startUrl: dto.websiteUrl,
+          steps: baseJourney.steps.map((step, idx) =>
+            idx === 0 && step.action === 'navigate'
+              ? { ...step, value: dto.websiteUrl }
+              : step,
+          ),
+        }
       : baseJourney;
 
     const targetPersonas = getPersonas(dto?.personaIds);

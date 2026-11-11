@@ -1,4 +1,4 @@
-import { NotFoundException } from '@nestjs/common';
+import { BadRequestException, NotFoundException } from '@nestjs/common';
 import { Test, TestingModule } from '@nestjs/testing';
 import { EvaluationsService } from './evaluations.service';
 
@@ -21,5 +21,11 @@ describe('EvaluationsService', () => {
     await expect(
       service.runEvaluation({ journeyId: 'non-existent-journey' }),
     ).rejects.toThrow(NotFoundException);
+  });
+
+  it('should throw BadRequestException for invalid personaIds', async () => {
+    await expect(
+      service.runEvaluation({ personaIds: ['non-existent-persona'] }),
+    ).rejects.toThrow(BadRequestException);
   });
 });
