@@ -70,14 +70,14 @@ export function AppShell({ children }: { children: ReactNode }) {
   }, [drawerOpen]);
 
   const classNames = [
-    "dashboard",
+    "app",
     desktopOpen ? "" : "sidebar-collapsed",
     mobileOpen ? "sidebar-open" : "",
   ].join(" ");
 
   return (
     <MenuContext.Provider value={{ expanded, toggle }}>
-      <main className={classNames}>
+      <div className={classNames}>
         <Sidebar
           ref={sidebarRef}
           inert={!expanded}
@@ -91,8 +91,10 @@ export function AppShell({ children }: { children: ReactNode }) {
             onClick={() => setMobileOpen(false)}
           />
         )}
-        {children}
-      </main>
+        <main className="main" id="main">
+          {children}
+        </main>
+      </div>
     </MenuContext.Provider>
   );
 }

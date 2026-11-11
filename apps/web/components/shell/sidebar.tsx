@@ -2,21 +2,36 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
-import { Suspense, type Ref } from "react";
+import { Suspense, type ComponentType, type Ref } from "react";
+import {
+  HistoryIcon,
+  LayoutDashboardIcon,
+  LogoMark,
+  RouteIcon,
+  UsersIcon,
+} from "@/components/ui/icons";
+import { API_URL } from "@/lib/api";
+import { useApiHealth } from "@/lib/use-api-health";
 
-const NAV_GROUPS = [
+type NavLink = {
+  href: string;
+  label: string;
+  icon: ComponentType<{ size?: number }>;
+};
+
+const NAV_GROUPS: { caption: string; links: NavLink[] }[] = [
   {
-    caption: "WORKSPACE",
+    caption: "Workspace",
     links: [
-      { href: "/", icon: "◫", label: "Overview" },
-      { href: "/evaluations", icon: "◎", label: "Evaluations" },
+      { href: "/", label: "New evaluation", icon: LayoutDashboardIcon },
+      { href: "/evaluations", label: "Evaluation history", icon: HistoryIcon },
     ],
   },
   {
-    caption: "MASTERS",
+    caption: "Library",
     links: [
-      { href: "/masters/journeys", icon: "⇢", label: "Journeys" },
-      { href: "/masters/personas", icon: "♙", label: "Personas" },
+      { href: "/masters/journeys", label: "Journeys", icon: RouteIcon },
+      { href: "/masters/personas", label: "Personas", icon: UsersIcon },
     ],
   },
 ];
@@ -38,20 +53,18 @@ function SidebarNav({
       {NAV_GROUPS.map((group) => (
         <div className="nav-group" key={group.caption}>
           <p className="nav-caption">{group.caption}</p>
-          {group.links.map((link) => {
-            const active = isActive(pathname, link.href);
-            return (
-              <Link
-                key={link.href}
-                href={link.href}
-                className={`nav-item ${active ? "active" : ""}`}
-                aria-current={active ? "page" : undefined}
-                onClick={onNavigate}
-              >
-                <span aria-hidden="true">{link.icon}</span> {link.label}
-              </Link>
-            );
-          })}
+          {group.links.map(({ href, label, icon: Icon }) => (
+            <Link
+              key={href}
+              href={href}
+              className="nav-item"
+              aria-current={isActive(pathname, href) ? "page" : undefined}
+              onClick={onNavigate}
+            >
+              <Icon size={18} />
+              {label}
+            </Link>
+          ))}
         </div>
       ))}
     </nav>
@@ -60,6 +73,30 @@ function SidebarNav({
 
 function SidebarNavWithPath({ onNavigate }: { onNavigate: () => void }) {
   return <SidebarNav pathname={usePathname()} onNavigate={onNavigate} />;
+}
+
+const HEALTH_COPY = {
+  checking: "Checking connection…",
+  online: "Connected",
+  offline: "Unreachable",
+} as const;
+
+function ApiStatus() {
+  const health = useApiHealth();
+  return (
+    <div className="api-status" role="status" aria-live="polite">
+      <span
+        className={`pulse-dot ${
+          health === "online" ? "is-online" : health === "offline" ? "is-offline" : ""
+        }`}
+        aria-hidden="true"
+      />
+      <div>
+        <strong>API · {HEALTH_COPY[health]}</strong>
+        <span title={API_URL}>{API_URL.replace(/^https?:\/\//, "")}</span>
+      </div>
+    </div>
+  );
 }
 
 export function Sidebar({
@@ -73,19 +110,21 @@ export function Sidebar({
 }) {
   return (
     <aside className="sidebar" ref={ref} inert={inert}>
-      <div className="brand">
-        <div className="brand-mark">J</div>
-        <span>journey<span className="brand-light">lens</span></span>
-      </div>
+      <Link href="/" className="sidebar-brand" onClick={onNavigate}>
+        <LogoMark size={32} />
+        <div>
+          <strong>JourneyLens</strong>
+          <span>UX evaluation</span>
+        </div>
+      </Link>
 
       {/* usePathname suspends on dynamic routes under cacheComponents. */}
       <Suspense fallback={<SidebarNav pathname={null} onNavigate={onNavigate} />}>
         <SidebarNavWithPath onNavigate={onNavigate} />
       </Suspense>
 
-      <div className="sidebar-bottom">
-        <div className="status-dot" />
-        <span>Local environment</span>
+      <div className="sidebar-footer">
+        <ApiStatus />
       </div>
     </aside>
   );

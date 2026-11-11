@@ -1,66 +1,104 @@
 "use client";
 
-import type { ReactNode } from "react";
+import Link from "next/link";
+import { Fragment, type ReactNode } from "react";
+import { ChevronRightIcon, PanelLeftIcon } from "@/components/ui/icons";
 import { useMenu } from "./app-shell";
 
-export function PageHeader({
-  eyebrow,
-  title,
-  actions,
-}: {
-  eyebrow: string;
-  title: string;
-  actions?: ReactNode;
-}) {
+export type Crumb = { label: string; href?: string };
+
+function Topbar({ breadcrumbs }: { breadcrumbs: Crumb[] }) {
   const { expanded, toggle } = useMenu();
 
   return (
     <header className="topbar">
-      <div className="topbar-start">
-        <button
-          type="button"
-          className="menu-button"
-          aria-label={expanded ? "Close menu" : "Open menu"}
-          aria-expanded={expanded}
-          onClick={toggle}
-        >
-          <span aria-hidden="true" />
-          <span aria-hidden="true" />
-          <span aria-hidden="true" />
-        </button>
-        <div className="topbar-title">
-          <p className="eyebrow">{eyebrow}</p>
-          <h1>{title}</h1>
-        </div>
-      </div>
-      <div className="topbar-actions">
-        {actions}
-        <div className="avatar">B</div>
-      </div>
+      <button
+        type="button"
+        className="btn btn-ghost btn-icon"
+        aria-label={expanded ? "Hide navigation" : "Show navigation"}
+        aria-expanded={expanded}
+        onClick={toggle}
+      >
+        <PanelLeftIcon size={18} />
+      </button>
+      <nav aria-label="Breadcrumb">
+        <ol className="breadcrumbs">
+          {breadcrumbs.map((crumb, index) => {
+            const last = index === breadcrumbs.length - 1;
+            return (
+              <Fragment key={`${crumb.label}-${index}`}>
+                {index > 0 && <ChevronRightIcon size={14} />}
+                <li>
+                  {last || !crumb.href ? (
+                    <span aria-current={last ? "page" : undefined}>
+                      {crumb.label}
+                    </span>
+                  ) : (
+                    <Link href={crumb.href}>{crumb.label}</Link>
+                  )}
+                </li>
+              </Fragment>
+            );
+          })}
+        </ol>
+      </nav>
     </header>
   );
 }
 
-/** Standard page frame: header, content and footer. */
-export function ContentPage({
-  eyebrow,
+/** Standard page frame: top bar with breadcrumbs, page header, content, footer. */
+export function Page({
+  breadcrumbs,
   title,
+  description,
   actions,
   children,
 }: {
-  eyebrow: string;
+  breadcrumbs: Crumb[];
   title: string;
+  description?: ReactNode;
   actions?: ReactNode;
   children: ReactNode;
 }) {
   return (
-    <section className="main-content">
-      <PageHeader eyebrow={eyebrow} title={title} actions={actions} />
-      {children}
-      <footer className="page-footer">
-        <span>JourneyLens · Evidence-led website experience evaluation</span>
-        <span className="demo-tag">LIVE DATA · JOURNEYLENS API</span>
-      </footer>
-    </section>
+    <>
+      <Topbar breadcrumbs={breadcrumbs} />
+      <div className="page">
+        <div className="page-header">
+          <div>
+            <h1>{title}</h1>
+            {description && <p className="page-description">{description}</p>}
+          </div>
+          {actions && <div className="page-actions">{actions}</div>}
+        </div>
+        {children}
+        <footer className="page-footer">
+          <span>JourneyLens · Evidence-led website experience evaluation</span>
+          <span>Data served live by the JourneyLens API</span>
+        </footer>
+      </div>
+    </>
+  );
+}
+
+export function SectionHeader({
+  title,
+  description,
+  actions,
+  id,
+}: {
+  title: string;
+  description?: ReactNode;
+  actions?: ReactNode;
+  id?: string;
+}) {
+  return (
+    <div className="section-header">
+      <div>
+        <h2 id={id}>{title}</h2>
+        {description && <p>{description}</p>}
+      </div>
+      {actions && <div className="section-actions">{actions}</div>}
+    </div>
   );
 }

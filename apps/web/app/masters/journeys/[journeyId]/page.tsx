@@ -3,12 +3,12 @@ import { Suspense } from "react";
 import { JourneyStepsScreen } from "@/components/masters/journey-steps-screen";
 
 export const metadata: Metadata = {
-  title: "Journey Steps | JourneyLens",
+  title: "Journey steps",
 };
 
 export default function JourneyStepsPage() {
   return (
-    <Suspense fallback={<section className="main-content" />}>
+    <Suspense fallback={null}>
       <JourneyStepsScreen />
     </Suspense>
   );

@@ -7,6 +7,7 @@ import {
   useState,
   type ReactNode,
 } from "react";
+import { CheckIcon } from "./icons";
 
 const TOAST_DURATION_MS = 3500;
 
@@ -31,7 +32,9 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       <div className="toast-region" role="status">
         {toast && (
           <div className="toast" key={toast.id}>
-            <span className="status-dot" aria-hidden="true" />
+            <span className="toast-icon" aria-hidden="true">
+              <CheckIcon size={16} />
+            </span>
             {toast.message}
           </div>
         )}

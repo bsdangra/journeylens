@@ -2,7 +2,7 @@ import type { Metadata } from "next";
 import { EvaluationsScreen } from "@/components/evaluations/evaluations-screen";
 
 export const metadata: Metadata = {
-  title: "Evaluations | JourneyLens",
+  title: "Evaluation history",
 };
 
 export default function EvaluationsPage() {

@@ -2,36 +2,58 @@
 
 import Link from "next/link";
 import { useState } from "react";
-import { ContentPage } from "@/components/shell/page-header";
+import { Page, SectionHeader } from "@/components/shell/page-header";
 import { DataTable, type Column } from "@/components/ui/data-table";
-import { Metric } from "@/components/ui/metric";
-import { Modal } from "@/components/ui/modal";
+import {
+  Avatar,
+  ProgressBar,
+  Stat,
+  StatusBadge,
+} from "@/components/ui/data-display";
+import { EmptyState } from "@/components/ui/feedback";
+import {
+  AlertTriangleIcon,
+  CheckCircleIcon,
+  GaugeIcon,
+  HistoryIcon,
+  PlayIcon,
+  SearchIcon,
+  TrashIcon,
+} from "@/components/ui/icons";
+import { ConfirmDialog, Modal } from "@/components/ui/modal";
 import { SearchInput } from "@/components/ui/search-input";
-import { StatusBadge } from "@/components/ui/status-badge";
+import { useToast } from "@/components/ui/toast";
 import { useEvaluationHistory } from "@/lib/evaluations/history-store";
 import type { EvaluationRun } from "@/lib/evaluations/types";
 import {
   formatDateTime,
   formatDuration,
   formatShortDate,
+  formatTime,
   hostnameOf,
+  plural,
 } from "@/lib/format";
 import { ScoreChart } from "./score-chart";
 
-const CHART_RUN_COUNT = 10;
+const CHART_RUN_COUNT = 12;
+
+const passRate = (run: EvaluationRun) =>
+  run.totalSteps ? (run.stepsPassed / run.totalSteps) * 100 : 0;
 
 export function EvaluationsScreen() {
-  const { runs, clearHistory } = useEvaluationHistory();
+  const { runs, latestEvaluation, clearHistory } = useEvaluationHistory();
+  const toast = useToast();
   const [query, setQuery] = useState("");
   const [statusFilter, setStatusFilter] = useState("all");
   const [viewingId, setViewingId] = useState<string | null>(null);
+  const [confirmClear, setConfirmClear] = useState(false);
 
   const normalizedQuery = query.trim().toLowerCase();
   const visible = runs.filter(
     (run) =>
       (statusFilter === "all" || run.status === statusFilter) &&
-      [run.journeyName, run.websiteUrl].some((value) =>
-        value.toLowerCase().includes(normalizedQuery)
+      [run.journeyName, run.websiteUrl, ...run.personas.map((p) => p.name)].some(
+        (value) => value.toLowerCase().includes(normalizedQuery)
       )
   );
   const viewing = runs.find((run) => run.id === viewingId);
@@ -44,170 +66,228 @@ export function EvaluationsScreen() {
     ? Math.round(scores.reduce((total, score) => total + score, 0) / scores.length)
     : null;
   const totalFindings = runs.reduce((total, run) => total + run.findings, 0);
+  const chartMetric = scores.length > 0 ? "score" : "passRate";
 
   const columns: Column<EvaluationRun>[] = [
     {
       header: "Journey",
+      primary: true,
       cell: (run) => (
-        <div className="table-primary">
+        <div className="cell-primary">
           <strong>{run.journeyName}</strong>
           <span>{hostnameOf(run.websiteUrl)}</span>
         </div>
       ),
     },
-    { header: "Date", cell: (run) => formatShortDate(run.createdAt) },
-    { header: "Personas", cell: (run) => run.personas.length },
-    { header: "Status", cell: (run) => <StatusBadge status={run.status} /> },
-    { header: "Score", cell: (run) => run.score ?? "—" },
     {
-      header: "Steps passed",
-      cell: (run) => `${run.stepsPassed}/${run.totalSteps}`,
+      header: "Run",
+      cell: (run) => (
+        <div className="cell-primary" style={{ minWidth: 0 }}>
+          <strong>{formatShortDate(run.createdAt)}</strong>
+          <span>{formatTime(run.createdAt)}</span>
+        </div>
+      ),
     },
     {
-      header: "Actions",
+      header: "Personas",
       cell: (run) => (
-        <div className="row-actions">
-          <button
-            type="button"
-            className="row-action"
-            aria-label={`View ${run.journeyName} run from ${formatShortDate(run.createdAt)}`}
-            onClick={() => setViewingId(run.id)}
-          >
-            View
-          </button>
+        <span className="cell-with-avatar" title={run.personas.map((p) => p.name).join(", ")}>
+          {run.personas.slice(0, 3).map((persona) => (
+            <Avatar key={persona.name} name={persona.name} size="sm" />
+          ))}
+          {run.personas.length > 3 && <span>+{run.personas.length - 3}</span>}
+        </span>
+      ),
+    },
+    { header: "Status", cell: (run) => <StatusBadge status={run.status} /> },
+    {
+      header: "Steps passed",
+      cell: (run) => (
+        <div style={{ display: "grid", gap: 6, minWidth: 110 }}>
+          <span>
+            {run.stepsPassed}/{run.totalSteps}
+          </span>
+          <ProgressBar
+            value={passRate(run)}
+            tone={passRate(run) === 100 ? "success" : "danger"}
+            label="Steps passed"
+          />
         </div>
+      ),
+    },
+    { header: "Score", cell: (run) => run.score ?? <span className="stat-meta">Pending</span> },
+    { header: "Findings", cell: (run) => run.findings },
+    {
+      header: "Actions",
+      hideLabel: true,
+      align: "right",
+      cell: (run) => (
+        <button
+          type="button"
+          className="btn btn-secondary btn-sm"
+          aria-label={`View ${run.journeyName} run from ${formatDateTime(run.createdAt)}`}
+          onClick={() => setViewingId(run.id)}
+        >
+          View
+        </button>
       ),
     },
   ];
 
+  const newEvaluation = (
+    <Link href="/" className="btn btn-primary">
+      <PlayIcon size={14} /> New evaluation
+    </Link>
+  );
+
   return (
-    <ContentPage
-      eyebrow="WORKSPACE / EVALUATIONS"
+    <Page
+      breadcrumbs={[{ label: "Workspace" }, { label: "Evaluation history" }]}
       title="Evaluation history"
+      description="Every evaluation run in this browser tab. History is kept until the tab is closed."
       actions={
         <>
           {runs.length > 0 && (
             <button
               type="button"
-              className="btn-secondary"
-              onClick={() => {
-                if (window.confirm("Clear all evaluation history in this tab?")) {
-                  clearHistory();
-                }
-              }}
+              className="btn btn-secondary"
+              onClick={() => setConfirmClear(true)}
             >
-              Clear history
+              <TrashIcon size={16} /> Clear history
             </button>
           )}
-          <Link href="/" className="run-button topbar-link">
-            New evaluation
-          </Link>
+          {newEvaluation}
         </>
       }
     >
-      <section className="section" aria-label="Summary">
-        <div className="metrics-grid">
-          <Metric
-            label="TOTAL RUNS"
-            value={String(runs.length)}
-            detail={`${completed.length} completed, ${runs.length - completed.length} failed`}
-          />
-          <Metric
-            label="AVERAGE SCORE"
-            value={averageScore === null ? "—" : String(averageScore)}
-            detail={scores.length ? `Across ${scores.length} scored runs, out of 100` : "No scored runs yet"}
-          />
-          <Metric
-            label="SUCCESS RATE"
-            value={
-              runs.length
-                ? `${Math.round((completed.length / runs.length) * 100)}%`
-                : "—"
-            }
-            detail="Runs that finished every step"
-          />
-          <Metric
-            label="UX FINDINGS"
-            value={String(totalFindings)}
-            detail="Across all runs"
+      {runs.length === 0 ? (
+        <div className="card">
+          <EmptyState
+            icon={<HistoryIcon size={22} />}
+            title="No evaluations yet"
+            description="Runs you start from New evaluation appear here, with their status, steps passed and findings."
+            actions={newEvaluation}
           />
         </div>
-      </section>
-
-      <section className="section">
-        <div className="section-heading">
-          <div>
-            <h2>Score by run</h2>
-            <p>The {Math.min(runs.length, CHART_RUN_COUNT)} most recent runs, out of 100.</p>
-          </div>
-        </div>
-        {runs.length === 0 ? (
-          <div className="empty-state">
-            No evaluations yet. Run one from <Link href="/">Overview</Link>;
-            results are kept until you close this tab.
-          </div>
-        ) : (
-          <ScoreChart runs={runs.slice(0, CHART_RUN_COUNT).reverse()} />
-        )}
-      </section>
-
-      <section className="section">
-        <div className="section-heading">
-          <div>
-            <h2>All runs</h2>
-            <p>
-              Showing {visible.length} of {runs.length}
-            </p>
-          </div>
-          <div className="toolbar">
-            <SearchInput
-              label="Search by journey or website"
-              value={query}
-              onChange={setQuery}
+      ) : (
+        <>
+          <div className="stat-grid">
+            <Stat
+              label="Total runs"
+              icon={<HistoryIcon size={16} />}
+              value={runs.length}
+              meta={`${completed.length} completed · ${runs.length - completed.length} failed`}
             />
-            <select
-              className="form-control toolbar-select"
-              aria-label="Filter by status"
-              value={statusFilter}
-              onChange={(event) => setStatusFilter(event.target.value)}
-            >
-              <option value="all">All statuses</option>
-              <option value="completed">Completed</option>
-              <option value="failed">Failed</option>
-            </select>
+            <Stat
+              label="Success rate"
+              icon={<CheckCircleIcon size={16} />}
+              value={`${Math.round((completed.length / runs.length) * 100)}%`}
+              meta="Runs that finished every step"
+            />
+            <Stat
+              label="Average score"
+              icon={<GaugeIcon size={16} />}
+              value={averageScore ?? "–"}
+              meta={
+                scores.length
+                  ? `Across ${plural(scores.length, "scored run")}`
+                  : "Pending AI scoring"
+              }
+            />
+            <Stat
+              label="UX findings"
+              icon={<AlertTriangleIcon size={16} />}
+              value={totalFindings}
+              meta="Across all runs"
+            />
           </div>
-        </div>
 
-        {visible.length === 0 ? (
-          <div className="empty-state">
-            {runs.length === 0 ? "No runs yet." : "No runs match these filters."}
-          </div>
-        ) : (
-          <DataTable
-            caption="Evaluation runs"
-            columns={columns}
-            rows={visible}
-            rowKey={(run) => run.id}
-          />
-        )}
-      </section>
+          <section className="section">
+            <SectionHeader
+              title={chartMetric === "score" ? "Score trend" : "Steps passed trend"}
+              description={`The ${plural(Math.min(runs.length, CHART_RUN_COUNT), "most recent run")}${
+                chartMetric === "passRate" ? ". Shows pass rate until runs are scored." : "."
+              }`}
+            />
+            <ScoreChart
+              runs={runs.slice(0, CHART_RUN_COUNT).reverse()}
+              metric={chartMetric}
+            />
+          </section>
+
+          <section className="section">
+            <SectionHeader
+              title="All runs"
+              description={`Showing ${visible.length} of ${runs.length}`}
+              actions={
+                <div className="toolbar">
+                  <SearchInput
+                    label="Search journey, site or persona"
+                    value={query}
+                    onChange={setQuery}
+                  />
+                  <select
+                    className="select select-sm"
+                    aria-label="Filter by status"
+                    value={statusFilter}
+                    onChange={(event) => setStatusFilter(event.target.value)}
+                  >
+                    <option value="all">All statuses</option>
+                    <option value="completed">Completed</option>
+                    <option value="failed">Failed</option>
+                  </select>
+                </div>
+              }
+            />
+            {visible.length === 0 ? (
+              <div className="card">
+                <EmptyState
+                  icon={<SearchIcon size={22} />}
+                  title="No matching runs"
+                  description="Try a different search term or status filter."
+                  actions={
+                    <button
+                      type="button"
+                      className="btn btn-secondary"
+                      onClick={() => {
+                        setQuery("");
+                        setStatusFilter("all");
+                      }}
+                    >
+                      Clear filters
+                    </button>
+                  }
+                />
+              </div>
+            ) : (
+              <DataTable
+                caption="Evaluation runs"
+                columns={columns}
+                rows={visible}
+                rowKey={(run) => run.id}
+              />
+            )}
+          </section>
+        </>
+      )}
 
       {viewing && (
         <Modal
           title={viewing.journeyName}
-          description={formatDateTime(viewing.createdAt)}
+          description={`${formatDateTime(viewing.createdAt)} · ${hostnameOf(viewing.websiteUrl)}`}
           onClose={() => setViewingId(null)}
         >
-          <div className="modal-body modal-copy">
-            <StatusBadge status={viewing.status} />
-            <dl className="run-facts">
+          <div className="modal-body">
+            <dl className="run-detail-stats">
               <div>
-                <dt>Website</dt>
-                <dd>{viewing.websiteUrl}</dd>
+                <dt>Status</dt>
+                <dd>
+                  <StatusBadge status={viewing.status} />
+                </dd>
               </div>
               <div>
                 <dt>Overall score</dt>
-                <dd>{viewing.score ?? "—"}</dd>
+                <dd>{viewing.score ?? "Pending"}</dd>
               </div>
               <div>
                 <dt>Steps passed</dt>
@@ -216,20 +296,19 @@ export function EvaluationsScreen() {
                 </dd>
               </div>
               <div>
-                <dt>Findings</dt>
-                <dd>{viewing.findings}</dd>
-              </div>
-              <div>
-                <dt>Duration</dt>
+                <dt>Run time</dt>
                 <dd>{formatDuration(viewing.durationMs)}</dd>
               </div>
             </dl>
-            <h3>Personas</h3>
-            <ul className="run-personas">
+            <h3 className="subheading">Personas</h3>
+            <ul className="run-persona-list">
               {viewing.personas.map((persona) => (
                 <li key={persona.name}>
-                  <span>{persona.name}</span>
-                  <strong>{persona.score ?? "—"}</strong>
+                  <span className="cell-with-avatar">
+                    <Avatar name={persona.name} size="sm" />
+                    {persona.name}
+                  </span>
+                  <strong>{persona.score ?? <span className="stat-meta">Pending</span>}</strong>
                 </li>
               ))}
             </ul>
@@ -237,14 +316,37 @@ export function EvaluationsScreen() {
           <div className="modal-footer">
             <button
               type="button"
-              className="btn-secondary"
+              className="btn btn-secondary"
               onClick={() => setViewingId(null)}
             >
               Close
             </button>
+            {latestEvaluation?.id === viewing.id && (
+              <Link href="/#latest-result" className="btn btn-primary">
+                Open full report
+              </Link>
+            )}
           </div>
         </Modal>
       )}
-    </ContentPage>
+
+      {confirmClear && (
+        <ConfirmDialog
+          title="Clear evaluation history?"
+          confirmLabel="Clear history"
+          onClose={() => setConfirmClear(false)}
+          onConfirm={() => {
+            clearHistory();
+            setConfirmClear(false);
+            toast("Evaluation history cleared.");
+          }}
+        >
+          <p>
+            All {plural(runs.length, "run")} and the latest report will be
+            removed from this browser tab. This cannot be undone.
+          </p>
+        </ConfirmDialog>
+      )}
+    </Page>
   );
 }

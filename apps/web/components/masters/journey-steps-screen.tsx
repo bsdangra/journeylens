@@ -2,10 +2,24 @@
 
 import Link from "next/link";
 import { useParams } from "next/navigation";
-import { ContentPage } from "@/components/shell/page-header";
-import { ErrorState, LoadingState } from "@/components/ui/load-state";
+import { Page, SectionHeader } from "@/components/shell/page-header";
+import { Badge } from "@/components/ui/data-display";
+import { EmptyState, ErrorAlert, SkeletonRows } from "@/components/ui/feedback";
+import {
+  ArrowLeftIcon,
+  CheckIcon,
+  ExternalLinkIcon,
+  PlayIcon,
+  RouteIcon,
+} from "@/components/ui/icons";
 import { ACTION_LABELS, ASSERTION_LABELS } from "@/lib/catalog/labels";
 import { useJourney } from "@/lib/catalog/store";
+import { plural } from "@/lib/format";
+
+const BASE_CRUMBS = [
+  { label: "Library" },
+  { label: "Journeys", href: "/masters/journeys" },
+];
 
 export function JourneyStepsScreen() {
   const params = useParams<{ journeyId: string }>();
@@ -13,8 +27,8 @@ export function JourneyStepsScreen() {
   const { state, reload } = useJourney(journeyId);
 
   const backLink = (
-    <Link href="/masters/journeys" className="btn-secondary topbar-link">
-      ← All journeys
+    <Link href="/masters/journeys" className="btn btn-secondary">
+      <ArrowLeftIcon size={16} /> All journeys
     </Link>
   );
 
@@ -22,131 +36,163 @@ export function JourneyStepsScreen() {
     const notFound =
       state.status === "error" && /not found/i.test(state.error);
     return (
-      <ContentPage
-        eyebrow="MASTERS / JOURNEYS / STEPS"
-        title={notFound ? "Journey not found" : journeyId}
+      <Page
+        breadcrumbs={[...BASE_CRUMBS, { label: journeyId }]}
+        title={notFound ? "Journey not found" : "Journey"}
         actions={backLink}
       >
-        <section className="section">
-          {state.status === "loading" ? (
-            <LoadingState label="Loading journey steps…" />
-          ) : (
-            <ErrorState
-              title={
-                notFound
-                  ? "This journey doesn't exist."
-                  : "Could not load this journey."
-              }
-              message={state.error}
-              onRetry={notFound ? undefined : reload}
+        {state.status === "loading" ? (
+          <div className="card">
+            <SkeletonRows rows={5} label="Loading journey steps" />
+          </div>
+        ) : notFound ? (
+          <div className="card">
+            <EmptyState
+              icon={<RouteIcon size={22} />}
+              title="This journey does not exist"
+              description={state.error}
+              actions={backLink}
             />
-          )}
-        </section>
-      </ContentPage>
+          </div>
+        ) : (
+          <ErrorAlert
+            title="Could not load this journey."
+            message={state.error}
+            onRetry={reload}
+          />
+        )}
+      </Page>
     );
   }
 
   const journey = state.data;
 
   return (
-    <ContentPage
-      eyebrow="MASTERS / JOURNEYS / STEPS"
+    <Page
+      breadcrumbs={[...BASE_CRUMBS, { label: journey.name }]}
       title={journey.name}
-      actions={backLink}
+      description={journey.description}
+      actions={
+        <>
+          <a
+            href={journey.startUrl}
+            target="_blank"
+            rel="noreferrer"
+            className="btn btn-secondary"
+          >
+            Open website <ExternalLinkIcon size={14} />
+          </a>
+          <Link href="/" className="btn btn-primary">
+            <PlayIcon size={14} /> Run evaluation
+          </Link>
+        </>
+      }
     >
-      <section className="section">
-        <div className="record-summary">
-          <div className="record-summary-copy">
-            <span className="key-chip">{journey.id}</span>
-            <a
-              href={journey.startUrl}
-              target="_blank"
-              rel="noreferrer"
-              className="text-link"
-            >
+      <dl className="card journey-overview">
+        <div>
+          <dt>Journey ID</dt>
+          <dd>
+            <span className="id-chip">{journey.id}</span>
+          </dd>
+        </div>
+        <div>
+          <dt>Start URL</dt>
+          <dd>
+            <a className="link" href={journey.startUrl} target="_blank" rel="noreferrer">
               {journey.startUrl}
             </a>
-          </div>
-          {journey.description && (
-            <p className="readonly-note">{journey.description}</p>
+          </dd>
+        </div>
+        <div>
+          <dt>Steps</dt>
+          <dd>
+            {plural(journey.steps.length, "step")} ·{" "}
+            {plural(
+              journey.steps.reduce(
+                (total, step) => total + (step.assertions?.length ?? 0),
+                0
+              ),
+              "check"
+            )}
+          </dd>
+        </div>
+      </dl>
+
+      <section className="section">
+        <SectionHeader
+          title="Step sequence"
+          description="The browser performs these steps in order, then verifies each check."
+        />
+        <div className="card">
+          {journey.steps.length === 0 ? (
+            <EmptyState
+              icon={<RouteIcon size={22} />}
+              title="No steps"
+              description="This journey has no steps defined."
+            />
+          ) : (
+            <ol className="step-list">
+              {journey.steps.map((step, index) => (
+                <li className="step-item" key={step.id}>
+                  <span className="step-number" aria-hidden="true">
+                    {index + 1}
+                  </span>
+                  <div style={{ minWidth: 0 }}>
+                    <div className="step-item-head">
+                      <strong>{step.description}</strong>
+                      <span className={`badge action-badge-${step.action}`}>
+                        {ACTION_LABELS[step.action] ?? step.action}
+                      </span>
+                      <Badge>{step.id}</Badge>
+                    </div>
+                    {(step.target || step.value || step.timeout) && (
+                      <dl className="step-item-fields">
+                        {step.target && (
+                          <>
+                            <dt>Element</dt>
+                            <dd>
+                              <code>{step.target}</code>
+                            </dd>
+                          </>
+                        )}
+                        {step.value && (
+                          <>
+                            <dt>{step.action === "navigate" ? "URL" : "Value"}</dt>
+                            <dd>
+                              <code>{step.value}</code>
+                            </dd>
+                          </>
+                        )}
+                        {step.timeout && (
+                          <>
+                            <dt>Timeout</dt>
+                            <dd>
+                              <code>{step.timeout} ms</code>
+                            </dd>
+                          </>
+                        )}
+                      </dl>
+                    )}
+                    {step.assertions && step.assertions.length > 0 && (
+                      <ul className="assertion-list">
+                        {step.assertions.map((assertion, assertionIndex) => (
+                          <li key={assertionIndex}>
+                            <CheckIcon size={14} />
+                            {assertion.description}
+                            <Badge>
+                              {ASSERTION_LABELS[assertion.type] ?? assertion.type}
+                            </Badge>
+                          </li>
+                        ))}
+                      </ul>
+                    )}
+                  </div>
+                </li>
+              ))}
+            </ol>
           )}
         </div>
       </section>
-
-      <section className="section">
-        <div className="section-heading">
-          <div>
-            <h2>Step sequence</h2>
-            <p>
-              {journey.steps.length}{" "}
-              {journey.steps.length === 1 ? "step" : "steps"}, run in this order
-              from top to bottom. Steps are defined in the journey engine and
-              are read-only here.
-            </p>
-          </div>
-        </div>
-
-        {journey.steps.length === 0 ? (
-          <div className="empty-state">This journey has no steps.</div>
-        ) : (
-          <ol className="step-sequence">
-            {journey.steps.map((step, index) => (
-              <li className="sequence-step" key={step.id}>
-                <span className="sequence-number">{index + 1}</span>
-                <div className="sequence-copy">
-                  <div className="sequence-title">
-                    <span className={`action-tag action-${step.action}`}>
-                      {ACTION_LABELS[step.action] ?? step.action}
-                    </span>
-                    <strong>{step.description}</strong>
-                    <small>{step.id}</small>
-                  </div>
-                  {(step.target || step.value || step.timeout) && (
-                    <dl className="sequence-fields">
-                      {step.target && (
-                        <div>
-                          <dt>Target</dt>
-                          <dd>
-                            <code>{step.target}</code>
-                          </dd>
-                        </div>
-                      )}
-                      {step.value && (
-                        <div>
-                          <dt>Value</dt>
-                          <dd>
-                            <code>{step.value}</code>
-                          </dd>
-                        </div>
-                      )}
-                      {step.timeout && (
-                        <div>
-                          <dt>Timeout</dt>
-                          <dd>
-                            <code>{step.timeout} ms</code>
-                          </dd>
-                        </div>
-                      )}
-                    </dl>
-                  )}
-                  {step.assertions && step.assertions.length > 0 && (
-                    <ul className="sequence-assertions">
-                      {step.assertions.map((assertion, assertionIndex) => (
-                        <li key={assertionIndex}>
-                          <span>
-                            {ASSERTION_LABELS[assertion.type] ?? assertion.type}
-                          </span>
-                          {assertion.description}
-                        </li>
-                      ))}
-                    </ul>
-                  )}
-                </div>
-              </li>
-            ))}
-          </ol>
-        )}
-      </section>
-    </ContentPage>
+    </Page>
   );
 }

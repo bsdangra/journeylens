@@ -1,67 +1,89 @@
 import { formatShortDate } from "@/lib/format";
 import type { EvaluationRun } from "@/lib/evaluations/types";
 
-const GRID_LINES = [100, 50, 0];
+const GRID_LINES = [100, 75, 50, 25, 0];
 
-/** Single-series column chart of the most recent runs, oldest on the left. */
-export function ScoreChart({ runs }: { runs: EvaluationRun[] }) {
+export type ChartMetric = "score" | "passRate";
+
+function valueOf(run: EvaluationRun, metric: ChartMetric) {
+  if (metric === "score") return run.score;
+  return run.totalSteps
+    ? Math.round((run.stepsPassed / run.totalSteps) * 100)
+    : null;
+}
+
+/** Column chart of recent runs, oldest on the left. */
+export function ScoreChart({
+  runs,
+  metric,
+}: {
+  runs: EvaluationRun[];
+  metric: ChartMetric;
+}) {
+  const unit = metric === "score" ? "Score" : "Steps passed";
+
   return (
-    <div className="panel score-chart-panel">
-      <div className="score-chart">
-        <div className="score-chart-grid" aria-hidden="true">
+    <div className="card">
+      <div className="chart">
+        <div className="chart-grid" aria-hidden="true">
           {GRID_LINES.map((line) => (
             <span key={line} style={{ bottom: `${line}%` }}>
-              <small>{line}</small>
+              <small>
+                {line}
+                {metric === "passRate" ? "%" : ""}
+              </small>
             </span>
           ))}
         </div>
-        <ul className="score-chart-columns" aria-label="Score by run, oldest to newest">
-          {runs.map((run, index) => {
+        <ul
+          className="chart-bars"
+          aria-label={`${unit} by run, oldest to newest`}
+        >
+          {runs.map((run) => {
+            const value = valueOf(run, metric);
             const summary =
-              run.score !== null
-                ? `Score ${run.score} of 100`
+              value !== null
+                ? `${unit} ${value}${metric === "passRate" ? "%" : " of 100"}`
                 : run.status === "failed"
-                  ? "Failed, no score"
-                  : "Completed, not scored yet";
-            const isLatest = index === runs.length - 1;
+                  ? "Failed run"
+                  : "Not scored yet";
             return (
               <li
                 key={run.id}
-                className="score-column"
+                className="chart-bar"
                 tabIndex={0}
                 aria-label={`${formatShortDate(run.createdAt)}, ${run.journeyName}: ${summary}`}
               >
-                <div className="score-column-plot">
-                  {run.score === null ? (
-                    <span className="score-column-failed" aria-hidden="true">
-                      {run.status === "failed" ? "✕" : "–"}
-                    </span>
-                  ) : (
-                    <span
-                      className="score-column-bar"
-                      style={{ height: `${run.score}%` }}
-                    >
-                      {isLatest && (
-                        <span className="score-column-value">{run.score}</span>
-                      )}
-                    </span>
-                  )}
-                </div>
-                <small className="score-column-date" aria-hidden="true">
+                {value !== null ? (
+                  <span
+                    className="chart-bar-fill"
+                    style={{ height: `${value}%` }}
+                  />
+                ) : (
+                  <span
+                    className={`chart-bar-empty${run.status === "failed" ? " is-failed" : ""}`}
+                    aria-hidden="true"
+                  >
+                    {run.status === "failed" ? "✕" : "–"}
+                  </span>
+                )}
+                <span className="chart-bar-label" aria-hidden="true">
                   {formatShortDate(run.createdAt)}
-                </small>
-                <span className="score-tooltip" role="presentation">
+                </span>
+                <span className="chart-tooltip" role="presentation">
                   <strong>{summary}</strong>
-                  {run.journeyName}
-                  <br />
-                  {formatShortDate(run.createdAt)}
+                  {run.journeyName} · {run.personas.length} persona
+                  {run.personas.length === 1 ? "" : "s"}
                 </span>
               </li>
             );
           })}
         </ul>
       </div>
-      <p className="score-chart-note">✕ marks a failed run; – marks a completed run that has no score yet.</p>
+      <div className="chart-legend">
+        <span>Hover or focus a column for details.</span>
+        <span>✕ failed run</span>
+      </div>
     </div>
   );
 }

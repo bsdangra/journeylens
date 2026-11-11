@@ -1,5 +1,7 @@
 "use client";
 
+import { SearchIcon } from "./icons";
+
 export function SearchInput({
   label,
   value,
@@ -10,9 +12,10 @@ export function SearchInput({
   onChange: (value: string) => void;
 }) {
   return (
-    <div className="url-input search-input">
-      <span aria-hidden="true">⌕</span>
+    <div className="search">
+      <SearchIcon size={16} />
       <input
+        className="input"
         type="search"
         aria-label={label}
         placeholder={label}

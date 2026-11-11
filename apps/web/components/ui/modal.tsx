@@ -1,6 +1,7 @@
 "use client";
 
 import { useEffect, useId, useRef, type ReactNode } from "react";
+import { XIcon } from "./icons";
 
 /**
  * Mount only while open. Uses the native <dialog>, which provides the focus
@@ -12,13 +13,11 @@ export function Modal({
   title,
   description,
   onClose,
-  wide,
   children,
 }: {
   title: string;
   description?: string;
   onClose: () => void;
-  wide?: boolean;
   children: ReactNode;
 }) {
   const dialogRef = useRef<HTMLDialogElement>(null);
@@ -35,7 +34,7 @@ export function Modal({
   return (
     <dialog
       ref={dialogRef}
-      className={wide ? "modal modal-wide" : "modal"}
+      className="modal"
       aria-labelledby={titleId}
       onCancel={(event) => {
         event.preventDefault();
@@ -49,11 +48,11 @@ export function Modal({
         </div>
         <button
           type="button"
-          className="modal-close"
+          className="btn btn-ghost btn-icon"
           aria-label="Close dialog"
           onClick={onClose}
         >
-          ×
+          <XIcon size={18} />
         </button>
       </div>
       {children}
@@ -76,12 +75,12 @@ export function ConfirmDialog({
 }) {
   return (
     <Modal title={title} onClose={onClose}>
-      <div className="modal-body modal-copy">{children}</div>
+      <div className="modal-body">{children}</div>
       <div className="modal-footer">
-        <button type="button" className="btn-secondary" onClick={onClose}>
+        <button type="button" className="btn btn-secondary" onClick={onClose}>
           Cancel
         </button>
-        <button type="button" className="btn-danger" onClick={onConfirm}>
+        <button type="button" className="btn btn-danger" onClick={onConfirm}>
           {confirmLabel}
         </button>
       </div>
