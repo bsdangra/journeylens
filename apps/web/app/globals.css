@@ -242,7 +242,7 @@ button, input {
   border-radius: 12px;
   padding: 22px;
   display: grid;
-  grid-template-columns: 1.4fr 1fr auto;
+  grid-template-columns: 1.4fr 1fr;
   gap: 16px;
   align-items: end;
 }
@@ -668,9 +668,6 @@ footer {
 }
 
 @media (max-width: 700px) {
-  .sidebar { position: static; width: 100%; height: auto; padding: 15px 20px; }
-  .brand { margin: 0; }
-  .nav-caption, .nav-item, .sidebar-bottom { display: none; }
   .main-content { margin: 0; padding: 0 16px 30px; }
   .topbar { height: 75px; }
   .welcome-section { padding: 25px 20px; }

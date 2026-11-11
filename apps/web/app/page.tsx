@@ -1,172 +1,73 @@
 "use client";
 
+import Link from "next/link";
 import { useState } from "react";
+import { PageHeader } from "@/components/shell/page-header";
+import { Metric } from "@/components/ui/metric";
+import { ErrorState, LoadingState } from "@/components/ui/load-state";
+import { useToast } from "@/components/ui/toast";
+import { API_URL, errorMessage } from "@/lib/api";
+import { useCatalog } from "@/lib/catalog/store";
+import { useEvaluationHistory } from "@/lib/evaluations/history-store";
+import { runEvaluation as requestEvaluation } from "@/lib/evaluations/run";
+import { toEvaluationRun } from "@/lib/evaluations/summary";
 
-type PersonaReport = {
-  personaId: string;
-  summary: string;
-  score: {
-    overall: number | null;
-    usability: number | null;
-    efficiency: number | null;
-    accessibility: number | null;
-    clarity: number | null;
-  };
-  efficiency: {
-    totalSteps: number;
-    completedSteps: number;
-    failedSteps: number;
-    journeyDurationMs: number | null;
-    averageActionDurationMs: number | null;
-  };
-  findings: {
-    id: string;
-    title: string;
-    description: string;
-    severity: string;
-    recommendation: string;
-    evidence: string[];
-  }[];
-};
-
-type Execution = {
-  personaId: string;
-  status: string;
-  durationMs?: number;
-  steps: {
-    stepId: string;
-    status: string;
-    durationMs: number;
-    screenshotPath?: string;
-    pageTitle?: string;
-    pageUrl?: string;
-    error?: string;
-
-    assertions?: {
-      description: string;
-      passed: boolean;
-      expected?: string | number;
-      actual?: string | number;
-      error?: string;
-    }[];
-
-    consoleErrors?: string[];
-
-    failedRequests?: {
-      url: string;
-      method: string;
-      failure: string;
-    }[];
-
-    interactions?: {
-      action: string;
-      target?: string;
-      value?: string;
-      timestamp: string;
-    }[];
-
-    actionDurationMs?: number;
-    assertionDurationMs?: number;
-
-    accessibility?: {
-      violations: {
-        id: string;
-        impact: string | null;
-        description: string;
-        help: string;
-        helpUrl: string;
-        affectedElements: {
-          target: string[];
-          failureSummary: string | null;
-        }[];
-      }[];
-      incompleteChecks: {
-        id: string;
-        impact: string | null;
-        description: string;
-        help: string;
-        helpUrl: string;
-        affectedElements: {
-          target: string[];
-          failureSummary: string | null;
-        }[];
-      }[];
-      passes: number;
-      incomplete: number;
-      timestamp: string;
-    };
-  }[];
-};
-
-type Evaluation = {
-  id: string;
-  websiteUrl: string;
-  journeyId: string;
-  status: string;
-  createdAt: string;
-  reports: PersonaReport[];
-  executions: Execution[];
-};
-
-const API_URL =
-  process.env.NEXT_PUBLIC_API_URL ?? "http://localhost:3000";
-
-const personaNames: Record<string, string> = {
-  "first-time-shopper": "First-time shopper",
-  "time-conscious-shopper": "Time-conscious shopper",
-  "accessibility-conscious-shopper": "Accessibility-conscious shopper",
-};
-
-function Metric({
-  label,
-  value,
-  detail,
-}: {
-  label: string;
-  value: string;
-  detail: string;
-}) {
-  return (
-    <div className="metric-card">
-      <p className="metric-label">{label}</p>
-      <p className="metric-value">{value}</p>
-      <p className="metric-detail">{detail}</p>
-    </div>
-  );
-}
+const listFormat = new Intl.ListFormat("en-GB", { type: "conjunction" });
 
 export default function Home() {
-  const [evaluation, setEvaluation] = useState<Evaluation | null>(null);
+  const { state: catalog, reload: reloadCatalog } = useCatalog();
+  const { addRun, latestEvaluation } = useEvaluationHistory();
+  const toast = useToast();
+  const [journeyId, setJourneyId] = useState("");
+  const [personaIds, setPersonaIds] = useState<string[]>([]);
   const [loading, setLoading] = useState(false);
   const [error, setError] = useState("");
+  // The latest result comes from session storage, so it survives navigation.
+  const evaluation = loading ? null : latestEvaluation;
+
+  const journeys = catalog.status === "ready" ? catalog.data.journeys : [];
+  const personas = catalog.status === "ready" ? catalog.data.personas : [];
+  // Derived, so a selection clears itself if the API stops listing it.
+  const journey = journeys.find(
+    (item) => item.id === journeyId && item.stepCount > 0
+  );
+  const selectedPersonas = personas.filter((persona) =>
+    personaIds.includes(persona.id)
+  );
+
+  const missing = [
+    !journey && "a user journey",
+    selectedPersonas.length === 0 && "at least one persona",
+  ].filter((item): item is string => Boolean(item));
+
+  function togglePersona(personaId: string) {
+    setPersonaIds((current) =>
+      current.includes(personaId)
+        ? current.filter((id) => id !== personaId)
+        : [...current, personaId]
+    );
+  }
 
   async function runEvaluation() {
+    if (!journey || missing.length > 0) return;
+
     setLoading(true);
     setError("");
-    setEvaluation(null);
 
     try {
-      const response = await fetch(`${API_URL}/evaluations`, {
-        method: "POST",
-        headers: { "Content-Type": "application/json" },
-      });
-
-      if (!response.ok) {
-        throw new Error(`API returned ${response.status}`);
-      }
-
-      const result: Evaluation = await response.json();
-      setEvaluation(result);
+      const result = await requestEvaluation(journey, selectedPersonas);
+      addRun(toEvaluationRun(result, journey.name), result);
+      toast("Run added to Evaluations.");
     } catch (err) {
       setError(
-        err instanceof Error
-          ? err.message
-          : "Something went wrong while running the evaluation."
+        errorMessage(err, "Something went wrong while running the evaluation.")
       );
     } finally {
       setLoading(false);
     }
   }
+
+  const personaName = (id: string) => evaluation?.personaNames[id] ?? id;
 
   const reports = evaluation?.reports ?? [];
   const executions = evaluation?.executions ?? [];
@@ -188,38 +89,11 @@ export default function Home() {
   );
 
   return (
-    <main className="dashboard">
-      <aside className="sidebar">
-        <div className="brand">
-          <div className="brand-mark">J</div>
-          <span>journey<span className="brand-light">lens</span></span>
-        </div>
-
-        <p className="nav-caption">WORKSPACE</p>
-        <div className="nav-item active">
-          <span>◫</span> Overview
-        </div>
-        <div className="nav-item">
-          <span>◎</span> Evaluations
-        </div>
-        <div className="nav-item">
-          <span>♙</span> Personas
-        </div>
-
-        <div className="sidebar-bottom">
-          <div className="status-dot" />
-          <span>Local environment</span>
-        </div>
-      </aside>
-
       <section className="main-content">
-        <header className="topbar">
-          <div>
-            <p className="eyebrow">WORKSPACE / OVERVIEW</p>
-            <h1>Website experience overview</h1>
-          </div>
-          <div className="avatar">B</div>
-        </header>
+        <PageHeader
+          eyebrow="WORKSPACE / OVERVIEW"
+          title="Website experience overview"
+        />
 
         <section className="welcome-section">
           <div>
@@ -237,57 +111,139 @@ export default function Home() {
           <div className="section-heading">
             <div>
               <h2>Start an evaluation</h2>
-              <p>Run the configured demo journey against SauceDemo.</p>
+              <p>Choose a journey and the personas to simulate, then run it.</p>
             </div>
-            <span className="demo-tag">DEMO CONFIGURATION</span>
           </div>
 
+          {catalog.status === "loading" && (
+            <LoadingState label="Loading journeys and personas…" />
+          )}
+          {catalog.status === "error" && (
+            <ErrorState
+              title="Could not load journeys and personas."
+              message={catalog.error}
+              onRetry={reloadCatalog}
+            />
+          )}
+          {catalog.status === "ready" && (
           <div className="evaluation-form">
             <div className="field">
-              <label>WEBSITE URL</label>
-              <div className="url-input">
-                <span>↗</span>
-                <input value="https://www.saucedemo.com/" readOnly />
-              </div>
+              <label htmlFor="user-journey">USER JOURNEY</label>
+              <select
+                id="user-journey"
+                className="form-control"
+                value={journey?.id ?? ""}
+                disabled={loading}
+                onChange={(event) => setJourneyId(event.target.value)}
+              >
+                <option value="">Select a journey</option>
+                {journeys.map((item) => (
+                  <option
+                    key={item.id}
+                    value={item.id}
+                    disabled={item.stepCount === 0}
+                  >
+                    {item.name} ·{" "}
+                    {item.stepCount === 0
+                      ? "no steps"
+                      : `${item.stepCount} steps`}
+                  </option>
+                ))}
+              </select>
+              {journeys.length === 0 ? (
+                <p className="field-hint">The API has no journeys yet.</p>
+              ) : (
+                journey && (
+                  <p className="journey-meta">
+                    {journey.description}{" "}
+                    <Link
+                      href={`/masters/journeys/${encodeURIComponent(journey.id)}`}
+                    >
+                      View steps
+                    </Link>
+                  </p>
+                )
+              )}
             </div>
             <div className="field">
-              <label>USER JOURNEY</label>
-              <div className="select-display">
-                Purchase a product <span>⌄</span>
+              <label htmlFor="website-url">TARGET WEBSITE</label>
+              <div className="url-input is-readonly">
+                <span aria-hidden="true">↗</span>
+                <input
+                  id="website-url"
+                  type="url"
+                  readOnly
+                  placeholder="Set by the selected journey"
+                  value={journey?.startUrl ?? ""}
+                  aria-describedby="website-url-hint"
+                />
               </div>
+              <p className="field-hint" id="website-url-hint">
+                Each journey runs against its own start URL.
+              </p>
             </div>
-            <button
-              className="run-button"
-              onClick={runEvaluation}
-              disabled={loading}
-            >
-              {loading ? (
-                <>
-                  <span className="spinner" /> Running evaluation...
-                </>
-              ) : (
-                <>Run demo evaluation <span>→</span></>
-              )}
-            </button>
-          </div>
 
-          <div className="persona-row">
-            <span className="persona-label">EVALUATION PERSONAS</span>
-            {Object.entries(personaNames).map(([id, name], index) => (
-              <span className="persona-chip" key={id}>
-                <span className={`persona-dot dot-${index}`} />
-                {name}
-              </span>
-            ))}
+            <fieldset className="evaluation-personas" disabled={loading}>
+              <legend>EVALUATION PERSONAS</legend>
+              {personas.length === 0 ? (
+                <p className="field-hint">The API has no personas yet.</p>
+              ) : (
+                <div className="persona-options">
+                  {personas.map((persona) => {
+                    const selected = personaIds.includes(persona.id);
+                    return (
+                      <button
+                        type="button"
+                        className="persona-chip persona-toggle"
+                        key={persona.id}
+                        aria-pressed={selected}
+                        title={persona.description}
+                        onClick={() => togglePersona(persona.id)}
+                      >
+                        <span className="persona-check" aria-hidden="true">
+                          {selected ? "✓" : "+"}
+                        </span>
+                        {persona.name}
+                      </button>
+                    );
+                  })}
+                </div>
+              )}
+            </fieldset>
+
+            <div className="evaluation-actions">
+              {missing.length > 0 && (
+                <p className="evaluation-hint" id="run-hint">
+                  To run, add {listFormat.format(missing)}.
+                </p>
+              )}
+              <button
+                className={`run-button ${loading ? "is-running" : ""}`}
+                onClick={runEvaluation}
+                disabled={loading || missing.length > 0}
+                aria-describedby={missing.length > 0 ? "run-hint" : undefined}
+              >
+                {loading ? (
+                  <>
+                    <span className="spinner" /> Running evaluation...
+                  </>
+                ) : (
+                  <>Run evaluation <span>→</span></>
+                )}
+              </button>
+              {loading && (
+                <p className="evaluation-hint" role="status">
+                  The browser is running each persona through the journey. This
+                  can take a minute or two.
+                </p>
+              )}
+            </div>
           </div>
+          )}
 
           {error && (
-            <div className="error-banner">
+            <div className="error-banner" role="alert">
               <strong>Could not run evaluation.</strong> {error}
-              <p>
-                Check that the NestJS API is running and its CORS configuration
-                allows the web app.
-              </p>
             </div>
           )}
         </section>
@@ -305,9 +261,11 @@ export default function Home() {
               </p>
             </div>
             {evaluation && (
-              <span className="success-tag">
-                <span className="status-dot" /> {evaluation.status}
-              </span>
+              <div className="heading-tags">
+                <span className="success-tag">
+                  <span className="status-dot" /> {evaluation.status}
+                </span>
+              </div>
             )}
           </div>
 
@@ -363,10 +321,7 @@ export default function Home() {
                       <div className="report-card-top">
                         <div>
                           <span className="card-overline">PERSONA</span>
-                          <h3>
-                            {personaNames[report.personaId] ??
-                              report.personaId}
-                          </h3>
+                          <h3>{personaName(report.personaId)}</h3>
                         </div>
                         <span
                           className={`execution-status ${
@@ -440,8 +395,7 @@ export default function Home() {
                         <h3>{finding.title}</h3>
                         <p>{finding.description}</p>
                         <p className="finding-persona">
-                          {personaNames[finding.personaId] ??
-                            finding.personaId}
+                          {personaName(finding.personaId)}
                         </p>
                         <div className="recommendation">
                           <strong>Recommendation</strong>
@@ -475,9 +429,7 @@ export default function Home() {
               {executions.map((execution) => (
                 <details className="execution-panel" key={execution.personaId}>
                   <summary>
-                    <span>
-                      {personaNames[execution.personaId] ?? execution.personaId}
-                    </span>
+                    <span>{personaName(execution.personaId)}</span>
                     <span className="execution-count">
                       {execution.steps.filter((s) => s.status === "passed").length}
                       /{execution.steps.length} passed
@@ -680,6 +632,5 @@ export default function Home() {
 
         <footer>JourneyLens · Evidence-led website experience evaluation</footer>
       </section>
-    </main>
   );
 }
